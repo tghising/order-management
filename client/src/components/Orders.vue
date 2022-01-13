@@ -69,7 +69,7 @@ export default {
       return formatter.format(value);
     },
     getOrders() {
-      const params = this.getRequestParams(this.searchPartOrderOrProductName, this.page, this.pageSize);
+      const params = this.getRequestParams(this.page, this.pageSize, this.searchPartOrderOrProductName);
       FetchOrdersService.getAll(params)
           .then((response) => {
             this.orders = response.data.data
@@ -88,12 +88,8 @@ export default {
       this.getOrders();
     },
 
-    getRequestParams(searchPartOrderOrProductName, page, pageSize) {
+    getRequestParams(page, pageSize, searchPartOrderOrProductName) {
       let params = {};
-
-      if (searchPartOrderOrProductName) {
-        params["orderNameOrProduct"] = searchPartOrderOrProductName;
-      }
 
       if (page) {
         params["page"] = page;
@@ -102,6 +98,11 @@ export default {
       if (pageSize) {
         params["pageSize"] = pageSize;
       }
+
+      if (searchPartOrderOrProductName) {
+        params["orderNameOrProduct"] = searchPartOrderOrProductName;
+      }
+      
       return params;
     },
   },
