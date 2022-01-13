@@ -5,7 +5,6 @@ class FetchOrdersService {
         return http.get("/orders", {params});
     }
 
-
 }
 
 export default new FetchOrdersService();
