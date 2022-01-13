@@ -113,6 +113,11 @@ type JsonOrdersResponse struct {
 	GrandTotalAmount float64           `json:"grand_total_amount"`
 }
 
+type DefaultResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
 func main() {
 	// initialize the db tables
 	initializeDB()
@@ -124,14 +129,14 @@ func main() {
 	handleRequests()
 }
 
-func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome to the HomePage!")
+func homePage(rw http.ResponseWriter, req *http.Request) {
+	printMessage("Endpoint Hit: getOrders == > " + req.Host + req.URL.String())
+	json.NewEncoder(rw).Encode(DefaultResponse{Status: "Success", Message: "Welcome to the home page"})
 }
 
 func getOrders(rw http.ResponseWriter, req *http.Request) {
 	printMessage("Endpoint Hit: getOrders == > " + req.Host + req.URL.String())
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
-	db := dbConnect()
 
 	totalElements := 0
 	grandTotalAmount := 0.0
@@ -143,6 +148,12 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 	orderNameOrProduct := req.URL.Query().Get("orderNameOrProduct")
 
 	start := (page - 1) * pageSize
+	if page < 1 || pageSize < 1 {
+		json.NewEncoder(rw).Encode(DefaultResponse{Status: "Failed", Message: "Request without page and pageSize is invalid."})
+		return
+	}
+
+	db := dbConnect() // database connection for query orders query
 	if orderNameOrProduct != "" || len(orderNameOrProduct) > 0 {
 		searchTotalOrders, err := db.Query("SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount FROM (SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product from (select comp.company_name, c.name, c.user_id  from customer_companies comp, customers c where comp.company_id = c.company_id) cc, Orders o, (Select oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity from order_items oi join deliveries d on oi.id = d.order_item_id) od where cc.user_id = o.customer_id AND o.id = od.order_id AND (od.product LIKE '%' || $1 || '%' OR o.order_name LIKE '%' || $2 || '%')) RS ", orderNameOrProduct, orderNameOrProduct)
 		for searchTotalOrders.Next() {
