@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"log"
 	"net/http"
@@ -128,18 +129,19 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func getOrders(rw http.ResponseWriter, req *http.Request) {
+	printMessage("Endpoint Hit: getOrders == > " + req.Host + req.URL.String())
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
 	db := dbConnect()
+
 	totalElements := 0
 	grandTotalAmount := 0.0
 	totalPages := 0
 	var order_list []Customer_Orders
 
-	printMessage("Endpoint Hit: getOrders == > Getting orders .....")
-	orderNameOrProduct := req.URL.Query().Get("orderNameOrProduct")
-
 	page, _ := strconv.Atoi(req.URL.Query().Get("page"))
 	pageSize, _ := strconv.Atoi(req.URL.Query().Get("pageSize"))
+	orderNameOrProduct := req.URL.Query().Get("orderNameOrProduct")
+
 	start := (page - 1) * pageSize
 	if orderNameOrProduct != "" || len(orderNameOrProduct) > 0 {
 		searchTotalOrders, err := db.Query("SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount FROM (SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product from (select comp.company_name, c.name, c.user_id  from customer_companies comp, customers c where comp.company_id = c.company_id) cc, Orders o, (Select oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity from order_items oi join deliveries d on oi.id = d.order_item_id) od where cc.user_id = o.customer_id AND o.id = od.order_id AND (od.product LIKE '%' || $1 || '%' OR o.order_name LIKE '%' || $2 || '%')) RS ", orderNameOrProduct, orderNameOrProduct)
@@ -221,10 +223,20 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 }
 
 func handleRequests() {
+	// Init the mux router
+	router := mux.NewRouter()
+
+	// Route handles & endpoints
+
+	// get to home page records
+	router.HandleFunc("/", homePage).Methods("GET")
+
+	//get all orders records
+	router.HandleFunc("/api/orders", getOrders).Methods("GET")
+
+	// serve http requests
+	log.Fatal(http.ListenAndServe(":8090", router))
 	printMessage("The server has been started at port : 8090")
-	http.HandleFunc("/", homePage)
-	http.HandleFunc("/api/orders", getOrders)
-	log.Fatal(http.ListenAndServe(":8090", nil))
 }
 
 func initializeDB() {
