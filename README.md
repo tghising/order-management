@@ -8,16 +8,12 @@ Order management system using golang (go) backend/RESTAPI, PostgreSQL, and Vue J
 
 2. Create the GOPATH environment variable 
 ![img_2.png](img_2.png)
-3. 
-4. ![screenshots\img.png]
+ and Path: C:\Program Files\Go\bin 
 
-    and Path: C:\Program Files\Go\bin 
-
-5. Use [ATOM with Go-plus](https://atom.io/packages/go-plus) / [VS code](https://code.visualstudio.com/docs/languages/go) / [GoLand](https://www.jetbrains.com/go/) or other IDEs
-6. Create go application using GoLand (You can use other IDEs)
+3. Use [ATOM with Go-plus](https://atom.io/packages/go-plus) / [VS code](https://code.visualstudio.com/docs/languages/go) / [GoLand](https://www.jetbrains.com/go/) or other IDEs
+4. Create go application using GoLand (You can use other IDEs)
 ![img_3.png](img_3.png)
-7. 
-8. Create go program and run the main() method
+5. Create go program and run the main() method
 
 ## 2. PostgreSQL DB setup
 1. Download [PostgreSQL](https://www.postgresql.org/download/) from [https://www.postgresql.org/download/](https://www.postgresql.org/download/) and install PostgreSQL server, pgAdmin in your system.
