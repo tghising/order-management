@@ -100,7 +100,7 @@ type Customer_Orders struct {
 	OrderDate       string  `json:"order_date"`
 	DeliveredAmount float64 `json:"delivered_amount"`
 	TotalAmount     float64 `json:"total_amount"`
-	Product         string  `json:"product"`
+	Product         string  `json:"product_name"`
 }
 
 type JsonOrdersResponse struct {
@@ -181,7 +181,7 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 			err = orders.Scan(&order_name, &customer_company, &customer_name, &order_date, &delivered_amount, &total_amount, &product)
 			checkErr(err)
 			sum += total_amount
-			order_list = append(order_list, Customer_Orders{OrderName: order_name, CustomerCompany: customer_company,
+			order_list = append(order_list, Customer_Orders{OrderName: order_name + "\n" + product, CustomerCompany: customer_company,
 				CustomerName: customer_name, OrderDate: order_date, DeliveredAmount: delivered_amount, TotalAmount: total_amount, Product: product})
 		}
 
@@ -210,7 +210,8 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 
 			err = orders.Scan(&order_name, &customer_company, &customer_name, &order_date, &delivered_amount, &total_amount, &product)
 			checkErr(err)
-			order_list = append(order_list, Customer_Orders{OrderName: order_name, CustomerCompany: customer_company,
+
+			order_list = append(order_list, Customer_Orders{OrderName: order_name + "\n" + product, CustomerCompany: customer_company,
 				CustomerName: customer_name, OrderDate: order_date, DeliveredAmount: delivered_amount, TotalAmount: total_amount, Product: product})
 		}
 	}
