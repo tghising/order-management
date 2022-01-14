@@ -4,12 +4,13 @@ import {BootstrapVue} from 'bootstrap-vue'
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue/dist/bootstrap-vue.css'
 import router from './router'
+import DatePicker from "vue2-datepicker";
+import 'vue2-datepicker/index.css';
 
-import VMdDateRangePicker from "v-md-date-range-picker";
 Vue.config.productionTip = false
 
 Vue.use(BootstrapVue)
-Vue.use(VMdDateRangePicker)
+Vue.use(DatePicker)
 
 new Vue({
   router,

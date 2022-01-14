@@ -10,8 +10,9 @@
     </div>
     <div class="col-md-8">
       <br/>
-      <template id="orderDateRange">
-        <v-md-date-range-picker></v-md-date-range-picker>
+      <template>
+        <date-picker v-model="orderDateRange" placeholder="Order created date range" range format="YYYY-MM-DD"
+                     confirm></date-picker>
       </template>
     </div>
 
@@ -22,6 +23,9 @@
 
         <template #cell(order_name)="data">
           <div class="seprateOrderProduct">{{ data.value }}</div>
+        </template>
+        <template #cell(order_date)="data">
+          {{ formatOrderDate(data.value) }}
         </template>
 
         <template #cell(delivered_amount)="data">
@@ -76,6 +80,7 @@
 
 <script>
 import FetchOrdersService from "@/services/FetchOrdersService";
+import moment from 'moment';
 
 
 export default {
@@ -111,10 +116,17 @@ export default {
 
       grand_total_amount: 0.0,
       searchPartOrderOrProductName: "",
+      orderDateRange: "",
       page: 1,
       totalElements: 0,
       pageSize: 5,
     };
+  },
+  watch: {
+    'orderDateRange': function () {
+      this.page = 1
+      this.getOrders()
+    }
   },
   methods: {
     formatPrice(value) {
@@ -128,8 +140,11 @@ export default {
       });
       return formatter.format(value);
     },
+    formatOrderDate(value) {
+      return moment(String(value)).format('MMM Do, YYYY hh:mm A');
+    },
     getOrders() {
-      const params = this.getRequestParams(this.page, this.pageSize, this.searchPartOrderOrProductName);
+      const params = this.getRequestParams(this.page, this.pageSize, this.searchPartOrderOrProductName, this.orderDateRange);
       FetchOrdersService.getAll(params)
           .then((response) => {
             this.orders = response.data.data
@@ -148,7 +163,11 @@ export default {
       this.getOrders();
     },
 
-    getRequestParams(page, pageSize, searchPartOrderOrProductName) {
+    formatRequestOrderDate(value) {
+      return moment(String(value)).format('DD-MM-YYYY');
+    },
+
+    getRequestParams(page, pageSize, searchPartOrderOrProductName, orderDateRange) {
       let params = {};
 
       if (page) {
@@ -161,6 +180,10 @@ export default {
 
       if (searchPartOrderOrProductName) {
         params["orderNameOrProduct"] = searchPartOrderOrProductName;
+      }
+      if (orderDateRange) {
+        params["startDate"] = this.formatRequestOrderDate(orderDateRange[0]);
+        params["endDate"] = this.formatRequestOrderDate(orderDateRange[1]);
       }
 
       return params;

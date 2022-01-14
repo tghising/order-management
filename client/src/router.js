@@ -25,12 +25,6 @@ export default new Router({
             component: () => import("./components/Customers")
         },
         {
-            path: "/home",
-            alias: "/home",
-            name: "home",
-            component: () => import("./components/Home")
-        },
-        {
             path: "/orders",
             alias: "/orders",
             name: "orders",

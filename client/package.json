@@ -13,9 +13,10 @@
     "bootstrap-vue": "^2.16.0",
     "core-js": "^3.6.5",
     "install": "^0.13.0",
-    "v-md-date-range-picker": "^2.6.0",
     "vue": "^2.6.11",
-    "vue-router": "^3.3.4"
+    "vue-moment": "^4.1.0",
+    "vue-router": "^3.3.4",
+    "vue2-datepicker": "^3.10.4"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "~4.5.0",
