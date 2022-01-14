@@ -86,11 +86,11 @@ const (
 	searchByOrderOrProduct string = "" +
 		"SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date," +
 		"od.delivered_quantity*od.price_per_unit as delivered_amount, od.product " +
-		"from " +
-		"(select comp.company_name, c.name, c.user_id  from customer_companies comp, customers c where comp.company_id = c.company_id) cc," +
+		"FROM " +
+		"(SELECT comp.company_name, c.name, c.user_id FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc," +
 		"Orders o, " +
-		"(Select oi.order_id, oi.price_per_unit,oi.product, d.delivered_quantity from order_items oi join deliveries d on oi.id = d.order_item_id) od " +
-		"where cc.user_id = o.customer_id AND o.id = od.order_id AND (od.product like '%$1%' OR o.order_name like '%$2%')"
+		"(SELECT oi.order_id, oi.price_per_unit,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od " +
+		"WHERE cc.user_id = o.customer_id AND o.id = od.order_id AND (od.product like '%$1%' OR o.order_name like '%$2%')"
 )
 
 type Customer_Orders struct {
@@ -147,6 +147,9 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 	pageSize, _ := strconv.Atoi(req.URL.Query().Get("pageSize"))
 	orderNameOrProduct := req.URL.Query().Get("orderNameOrProduct")
 
+	startDate := req.URL.Query().Get("startDate")
+	endDate := req.URL.Query().Get("endDate")
+
 	start := (page - 1) * pageSize
 	if page < 1 || pageSize < 1 {
 		json.NewEncoder(rw).Encode(DefaultResponse{Status: "Failed", Message: "Request without page and pageSize is invalid."})
@@ -154,8 +157,17 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	db := dbConnect() // database connection for query orders query
-	if orderNameOrProduct != "" || len(orderNameOrProduct) > 0 {
-		searchTotalOrders, err := db.Query("SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount FROM (SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product from (select comp.company_name, c.name, c.user_id  from customer_companies comp, customers c where comp.company_id = c.company_id) cc, Orders o, (Select oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity from order_items oi join deliveries d on oi.id = d.order_item_id) od where cc.user_id = o.customer_id AND o.id = od.order_id AND (od.product LIKE '%' || $1 || '%' OR o.order_name LIKE '%' || $2 || '%')) RS ", orderNameOrProduct, orderNameOrProduct)
+
+	if len(orderNameOrProduct) > 0 && len(startDate) == 0 && len(endDate) == 0 { // handle for orderOrProduct search without date range picker
+		total_query := `
+			SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount 
+			FROM (SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product FROM (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc, 
+			Orders o, 
+			(SELECT oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od 
+			WHERE cc.user_id = o.customer_id AND o.id = od.order_id 
+			AND (od.product LIKE '%' || $1 || '%' OR o.order_name LIKE '%' || $2 || '%')) RS`
+
+		searchTotalOrders, err := db.Query(total_query, orderNameOrProduct, orderNameOrProduct)
 		for searchTotalOrders.Next() {
 			var total_count int
 			var grand_total_amount float64
@@ -165,7 +177,101 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 			grandTotalAmount = grand_total_amount
 		}
 
-		orders, err := db.Query("SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product from (select comp.company_name, c.name, c.user_id  from customer_companies comp, customers c where comp.company_id = c.company_id) cc, Orders o, (Select oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity from order_items oi join deliveries d on oi.id = d.order_item_id) od where cc.user_id = o.customer_id AND o.id = od.order_id AND (od.product LIKE '%' || $1 || '%' OR o.order_name LIKE '%' || $2 || '%') LIMIT $3 OFFSET $4", orderNameOrProduct, orderNameOrProduct, pageSize, start)
+		order_query := `
+				SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product 
+				FROM (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc, 
+				Orders o, 
+				(SELECT oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od WHERE cc.user_id = o.customer_id AND o.id = od.order_id AND (od.product LIKE '%' || $1 || '%' OR o.order_name LIKE '%' || $2 || '%') LIMIT $3 OFFSET $4`
+
+		orders, err := db.Query(order_query, orderNameOrProduct, orderNameOrProduct, pageSize, start)
+		checkErr(err)
+
+		for orders.Next() {
+			var order_name string
+			var customer_company string
+			var customer_name string
+			var order_date string
+			var delivered_amount float64
+			var total_amount float64
+			var product string
+
+			err = orders.Scan(&order_name, &customer_company, &customer_name, &order_date, &delivered_amount, &total_amount, &product)
+			checkErr(err)
+			order_list = append(order_list, Customer_Orders{OrderName: order_name + "\n" + product, CustomerCompany: customer_company,
+				CustomerName: customer_name, OrderDate: order_date, DeliveredAmount: delivered_amount, TotalAmount: total_amount, Product: product})
+		}
+	} else if len(startDate) > 0 && len(endDate) > 0 && len(orderNameOrProduct) == 0 { // handle for Date range of order created
+		total_query := `
+			SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount 
+			FROM (SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product FROM (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc, 
+			Orders o, 
+			(SELECT oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od 
+		WHERE cc.user_id = o.customer_id AND o.id = od.order_id 
+	  	AND o.created_at BETWEEN $1 AND $2) RS`
+
+		searchTotalOrders, err := db.Query(total_query, startDate, endDate)
+		for searchTotalOrders.Next() {
+			var total_count int
+			var grand_total_amount float64
+			err = searchTotalOrders.Scan(&total_count, &grand_total_amount)
+			checkErr(err)
+			totalElements = total_count
+			grandTotalAmount = grand_total_amount
+		}
+
+		order_query := `
+				SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product 
+				FROM (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc, 
+				Orders o, 
+				(SELECT oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od 
+				WHERE cc.user_id = o.customer_id AND o.id = od.order_id AND (o.created_at BETWEEN $1 AND $2) LIMIT $3 OFFSET $4`
+
+		orders, err := db.Query(order_query, startDate, endDate, pageSize, start)
+		checkErr(err)
+		sum := 0.0
+
+		for orders.Next() {
+			var order_name string
+			var customer_company string
+			var customer_name string
+			var order_date string
+			var delivered_amount float64
+			var total_amount float64
+			var product string
+
+			err = orders.Scan(&order_name, &customer_company, &customer_name, &order_date, &delivered_amount, &total_amount, &product)
+			checkErr(err)
+			sum += total_amount
+			order_list = append(order_list, Customer_Orders{OrderName: order_name + "\n" + product, CustomerCompany: customer_company,
+				CustomerName: customer_name, OrderDate: order_date, DeliveredAmount: delivered_amount, TotalAmount: total_amount, Product: product})
+		}
+
+	} else if len(startDate) > 0 && len(endDate) > 0 && len(orderNameOrProduct) > 0 { // handle for date range of order created and search orderNameOrProduct
+		total_query := `
+			SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount 
+			FROM (SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product FROM (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc, 
+			Orders o, 
+			(SELECT oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od 
+			WHERE cc.user_id = o.customer_id AND o.id = od.order_id AND (o.created_at BETWEEN $1 AND $2)
+			AND (od.product LIKE '%' || $3 || '%' OR o.order_name LIKE '%' || $4 || '%')) RS`
+
+		searchTotalOrders, err := db.Query(total_query, startDate, endDate, orderNameOrProduct, orderNameOrProduct)
+		for searchTotalOrders.Next() {
+			var total_count int
+			var grand_total_amount float64
+			err = searchTotalOrders.Scan(&total_count, &grand_total_amount)
+			checkErr(err)
+			totalElements = total_count
+			grandTotalAmount = grand_total_amount
+		}
+
+		order_query := `
+				SELECT o.order_name, cc.company_name as customer_company,cc.name as customer_name, o.created_at as order_date,od.delivered_quantity*od.price_per_unit as delivered_amount, od.quantity*od.price_per_unit as total_amount, od.product 
+				FROM (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc, 
+				Orders o, 
+				(SELECT oi.order_id, oi.quantity, oi.price_per_unit,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od WHERE cc.user_id = o.customer_id AND o.id = od.order_id AND (o.created_at BETWEEN $1 AND $2) AND (od.product LIKE '%' || $3 || '%' OR o.order_name LIKE '%' || $4 || '%') LIMIT $5 OFFSET $6`
+
+		orders, err := db.Query(order_query, startDate, endDate, orderNameOrProduct, orderNameOrProduct, pageSize, start)
 		checkErr(err)
 		sum := 0.0
 
@@ -186,7 +292,12 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 		}
 
 	} else {
-		ordersTotal, err := db.Query("SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount FROM (SELECT oid.order_name, cc.company_name as customer_company,cc.name as customer_name, oid.created_at as order_date,oid.delivered_quantity*oid.price_per_unit as delivered_amount,oid.quantity*oid.price_per_unit as total_amount, oid.product FROM (SELECT o.*, od.* from orders o join (select oi.order_id, oi.price_per_unit, oi.quantity,oi.product, d.delivered_quantity from order_items oi join deliveries d on oi.id = d.order_item_id) od on od.order_id = o.id) oid join (select comp.company_name, c.name, c.user_id  from customer_companies comp, customers c where comp.company_id = c.company_id) cc on oid.customer_id = cc.user_id) RS")
+		total_query := `
+			SELECT COUNT(*) as total_count, SUM(total_amount) as grand_total_amount FROM (SELECT oid.order_name, cc.company_name as customer_company,cc.name as customer_name, oid.created_at as order_date,oid.delivered_quantity*oid.price_per_unit as delivered_amount,oid.quantity*oid.price_per_unit as total_amount, oid.product 
+			FROM (SELECT o.*, od.* FROM orders o JOIN (SELECT oi.order_id, oi.price_per_unit, oi.quantity,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d on oi.id = d.order_item_id) od on od.order_id = o.id) oid JOIN (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc 
+			ON oid.customer_id = cc.user_id) RS`
+
+		ordersTotal, err := db.Query(total_query)
 		checkErr(err)
 		for ordersTotal.Next() {
 			var total_count int
@@ -197,7 +308,12 @@ func getOrders(rw http.ResponseWriter, req *http.Request) {
 			grandTotalAmount = grand_total_amount
 		}
 
-		orders, err := db.Query("SELECT oid.order_name, cc.company_name as customer_company,cc.name as customer_name, oid.created_at as order_date,oid.delivered_quantity*oid.price_per_unit as delivered_amount,oid.quantity*oid.price_per_unit as total, oid.product FROM (SELECT o.*, od.* from orders o join (select oi.order_id, oi.price_per_unit, oi.quantity,oi.product, d.delivered_quantity from order_items oi join deliveries d on oi.id = d.order_item_id) od on od.order_id = o.id) oid join (select comp.company_name, c.name, c.user_id  from customer_companies comp, customers c where comp.company_id = c.company_id) cc on oid.customer_id = cc.user_id LIMIT $1 OFFSET $2", pageSize, start)
+		order_query :=
+			`SELECT oid.order_name, cc.company_name as customer_company,cc.name as customer_name, oid.created_at as order_date,oid.delivered_quantity*oid.price_per_unit as delivered_amount,oid.quantity*oid.price_per_unit as total, oid.product 
+			 FROM (SELECT o.*, od.* FROM orders o JOIN (SELECT oi.order_id, oi.price_per_unit, oi.quantity,oi.product, d.delivered_quantity FROM order_items oi JOIN deliveries d ON oi.id = d.order_item_id) od ON od.order_id = o.id) oid JOIN (SELECT comp.company_name, c.name, c.user_id  FROM customer_companies comp, customers c WHERE comp.company_id = c.company_id) cc 
+			     ON oid.customer_id = cc.user_id LIMIT $1 OFFSET $2`
+
+		orders, err := db.Query(order_query, pageSize, start)
 		checkErr(err)
 		for orders.Next() {
 			var order_name string
