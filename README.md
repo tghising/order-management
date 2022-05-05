@@ -31,21 +31,32 @@ npm --version
 ```
 npm install vue
 ```
-## 3. Install Vue CLI
+## 3. Install Vue CLI 
 ```
 npm install -g @vue/cli
 ```
-### 4. Create Vue js app from command line
+## 4. Check the vue version
+```
+vue -v
+```
+## 5. If not working with security reason then run as administrator terminal
+```
+Set-ExecutionPolicy Unrestricted
+```
+```
+vue -v
+```
+### 6. Create Vue js app from command line
 ```
 vue create your_app_name
 ```
-### 5. Select  Vue version i.e. Vue 2, Vue 3
+### 7. Select  Vue version i.e. Vue 2, Vue 3
 ![img_6.png](img_6.png)
 
 ```
 cd your_app_name 
 ```
-### 6. Run the vue app
+### 8. Run the vue app
 ```
 npm run serve 
 ```
